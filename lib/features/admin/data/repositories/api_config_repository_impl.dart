@@ -14,20 +14,43 @@ class ApiConfigRepositoryImpl implements ApiConfigRepository {
   })  : _storageService = storageService,
         _apiClient = apiClient;
 
+  static final ApiConfig defaultConfig = ApiConfig(
+    name: 'MegaFlix TV Provider',
+    baseUrl: 'https://app.megafrixapi.com/TV/1.2/',
+    categoriesEndpoint: '/',
+    contentEndpoint: '/',
+    liveEndpoint: 'https://app.megafrixapi.com/TV/1.2/?page=viewChannels',
+    customHeaders: const {
+      'User-Agent': 'MegaFlix/1.2',
+      'Accept': '*/*',
+      'Referer': 'https://megaflix.name',
+    },
+    lastUpdated: DateTime.now(),
+  );
+
   @override
   Future<ApiConfig?> getActiveConfig() async {
     final json = await _storageService.getApiConfig();
-    if (json == null) return null;
-    final model = ApiConfigModel.fromJson(json);
+    final ApiConfig config;
+    if (json != null) {
+      config = ApiConfigModel.fromJson(json);
+    } else {
+      config = defaultConfig;
+      // Persiste automaticamente a configuração padrão para novas instalações
+      try {
+        final model = ApiConfigModel.fromEntity(config);
+        await _storageService.saveApiConfig(model.toJson());
+      } catch (_) {}
+    }
 
     // Atualiza o cliente de rede com as configurações ativas
     _apiClient.updateConfiguration(
-      baseUrl: model.baseUrl,
-      customHeaders: model.customHeaders,
-      authToken: model.authToken,
+      baseUrl: config.baseUrl,
+      customHeaders: config.customHeaders,
+      authToken: config.authToken,
     );
 
-    return model;
+    return config;
   }
 
   @override
