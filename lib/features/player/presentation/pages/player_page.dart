@@ -1,11 +1,12 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:dio/dio.dart';
 import 'package:video_player/video_player.dart';
+import '../../../../core/di/injection_container.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/tv_focusable.dart';
 import '../../../catalog/domain/entities/media_item.dart';
+import '../../../catalog/data/repositories/catalog_repository.dart';
 
 class PlayerPage extends StatefulWidget {
   final MediaItem item;
@@ -23,12 +24,21 @@ class _PlayerPageState extends State<PlayerPage> {
   String? _resolvedStreamUrl;
   bool _showControls = true;
   Timer? _hideControlsTimer;
+  late final CatalogRepository _catalogRepository;
 
   @override
   void initState() {
     super.initState();
+    _catalogRepository = sl<CatalogRepository>();
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    _initializePlayerWithResolution();
+    _initializePlayer();
+    _recordRecent();
+  }
+
+  Future<void> _recordRecent() async {
+    try {
+      await _catalogRepository.recordRecent(widget.item.id);
+    } catch (_) {}
   }
 
   @override
@@ -46,25 +56,26 @@ class _PlayerPageState extends State<PlayerPage> {
     }
   }
 
-  Future<void> _initializePlayerWithResolution() async {
+  Future<void> _initializePlayer() async {
     setState(() {
       _isResolvingStream = true;
       _errorMessage = null;
     });
 
     try {
-      String streamToPlay = widget.item.streamUrl;
+      // 1. Resolução dinâmica de stream via CatalogRepository (Warez2 / Voltz / HLS Token)
+      final resolvedUrl = await _catalogRepository.resolveStreamUrl(widget.item);
+      final streamToPlay = (resolvedUrl != null && resolvedUrl.isNotEmpty)
+          ? resolvedUrl
+          : widget.item.streamUrl;
 
-      // 1. Resolve token se a URL for um resolvedor dinâmico (MegaFlix get_token_channel.php)
-      if (streamToPlay.contains('get_token_channel.php') ||
-          streamToPlay.contains('token') ||
-          !streamToPlay.endsWith('.m3u8')) {
-        streamToPlay = await _resolveTokenToM3u8(streamToPlay);
+      if (streamToPlay.isEmpty) {
+        throw Exception('Não foi possível obter uma fonte de vídeo válida.');
       }
 
       _resolvedStreamUrl = streamToPlay;
 
-      // 2. Inicializa o VideoPlayerController com cabeçalhos HTTP adequados
+      // 2. Inicialização do player com headers padrão do CDN
       final headers = <String, String>{
         'User-Agent':
             'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
@@ -92,40 +103,10 @@ class _PlayerPageState extends State<PlayerPage> {
       if (mounted) {
         setState(() {
           _isResolvingStream = false;
-          _errorMessage = 'Falha ao sincronizar stream de vídeo: ${e.toString()}';
+          _errorMessage = 'Falha ao reproduzir mídia: ${e.toString()}';
         });
       }
     }
-  }
-
-  Future<String> _resolveTokenToM3u8(String url) async {
-    final dio = Dio();
-    try {
-      final response = await dio.get<String>(
-        url,
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: {
-            'User-Agent':
-                'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/139.0.0.0 Safari/537.36',
-            'Referer': 'https://megaflix.name',
-          },
-          sendTimeout: const Duration(seconds: 8),
-          receiveTimeout: const Duration(seconds: 8),
-        ),
-      );
-
-      final body = response.data ?? '';
-      // Extrai var stream = "https://...";
-      final regex = RegExp(r'var\s+stream\s*=\s*["\x27](https?://[^\s"\x27]+)["\x27]');
-      final match = regex.firstMatch(body);
-
-      if (match != null && match.group(1) != null) {
-        return match.group(1)!;
-      }
-    } catch (_) {}
-
-    return url;
   }
 
   void _startHideControlsTimer() {
@@ -179,8 +160,7 @@ class _PlayerPageState extends State<PlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    final isLive = widget.item.streamType == 'hls' ||
-        widget.item.overview?.contains('Ao Vivo') == true ||
+    final isLive = widget.item.isLive ||
         (_controller != null && _controller!.value.duration == Duration.zero);
 
     return Scaffold(
@@ -272,7 +252,7 @@ class _PlayerPageState extends State<PlayerPage> {
                             children: [
                               TvFocusable(
                                 autofocus: true,
-                                onPressed: _initializePlayerWithResolution,
+                                onPressed: _initializePlayer,
                                 child: Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                                   decoration: BoxDecoration(

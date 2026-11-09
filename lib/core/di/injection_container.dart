@@ -27,6 +27,7 @@ Future<void> initDependencies() async {
     () => CatalogRepository(
       apiClient: sl<DynamicApiClient>(),
       configRepository: sl<ApiConfigRepository>(),
+      storageService: sl<SecureStorageService>(),
     ),
   );
 

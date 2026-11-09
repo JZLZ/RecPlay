@@ -4,21 +4,25 @@ import 'package:flutter/services.dart';
 class TvFocusable extends StatefulWidget {
   final Widget child;
   final VoidCallback? onPressed;
+  final ValueChanged<bool>? onFocusChange;
   final FocusNode? focusNode;
   final bool autofocus;
   final BorderRadius borderRadius;
   final double scaleFactor;
   final EdgeInsets padding;
+  final Color? glowColor;
 
   const TvFocusable({
     super.key,
     required this.child,
     this.onPressed,
+    this.onFocusChange,
     this.focusNode,
     this.autofocus = false,
     this.borderRadius = const BorderRadius.all(Radius.circular(12)),
-    this.scaleFactor = 1.06,
+    this.scaleFactor = 1.08,
     this.padding = EdgeInsets.zero,
+    this.glowColor,
   });
 
   @override
@@ -38,9 +42,13 @@ class _TvFocusableState extends State<TvFocusable> {
 
   void _handleFocusChange() {
     if (mounted) {
-      setState(() {
-        _isFocused = _node.hasFocus;
-      });
+      final hasFocus = _node.hasFocus;
+      if (_isFocused != hasFocus) {
+        setState(() {
+          _isFocused = hasFocus;
+        });
+        widget.onFocusChange?.call(hasFocus);
+      }
     }
   }
 
@@ -56,15 +64,20 @@ class _TvFocusableState extends State<TvFocusable> {
 
   @override
   Widget build(BuildContext context) {
+    final effectiveGlowColor = widget.glowColor ?? Theme.of(context).colorScheme.primary;
+
     return Padding(
       padding: widget.padding,
       child: FocusableActionDetector(
         focusNode: _node,
         autofocus: widget.autofocus,
         onShowFocusHighlight: (show) {
-          setState(() {
-            _isFocused = show;
-          });
+          if (_isFocused != show) {
+            setState(() {
+              _isFocused = show;
+            });
+            widget.onFocusChange?.call(show);
+          }
         },
         actions: {
           ActivateIntent: CallbackAction<ActivateIntent>(
@@ -98,9 +111,9 @@ class _TvFocusableState extends State<TvFocusable> {
                 boxShadow: _isFocused
                     ? [
                         BoxShadow(
-                          color: Theme.of(context).colorScheme.primary.withOpacity(0.5),
-                          blurRadius: 16,
-                          spreadRadius: 2,
+                          color: effectiveGlowColor.withOpacity(0.65),
+                          blurRadius: 18,
+                          spreadRadius: 3,
                         ),
                       ]
                     : [],
