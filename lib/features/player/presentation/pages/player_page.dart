@@ -60,17 +60,12 @@ class _PlayerPageState extends State<PlayerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: Shortcuts(
-        shortcuts: const {
-          SingleActivator(LogicalKeyboardKey.arrowLeft): _SeekBackwardIntent(),
-          SingleActivator(LogicalKeyboardKey.arrowRight): _SeekForwardIntent(),
-          SingleActivator(LogicalKeyboardKey.select): _TogglePlayIntent(),
-          SingleActivator(LogicalKeyboardKey.mediaPlayPause): _TogglePlayIntent(),
-        },
-        actions: {
-          _SeekBackwardIntent: CallbackAction(onInvoke: (_) => _seekBy(-10)),
-          _SeekForwardIntent: CallbackAction(onInvoke: (_) => _seekBy(10)),
-          _TogglePlayIntent: CallbackAction(onInvoke: (_) => _togglePlayPause()),
+      body: CallbackShortcuts(
+        bindings: {
+          const SingleActivator(LogicalKeyboardKey.arrowLeft): () => _seekBy(-10),
+          const SingleActivator(LogicalKeyboardKey.arrowRight): () => _seekBy(10),
+          const SingleActivator(LogicalKeyboardKey.select): () => _togglePlayPause(),
+          const SingleActivator(LogicalKeyboardKey.mediaPlayPause): () => _togglePlayPause(),
         },
         child: Focus(
           autofocus: true,
@@ -220,16 +215,4 @@ class _PlayerPageState extends State<PlayerPage> {
       ),
     );
   }
-}
-
-class _SeekBackwardIntent extends Intent {
-  const _SeekBackwardIntent();
-}
-
-class _SeekForwardIntent extends Intent {
-  const _SeekForwardIntent();
-}
-
-class _TogglePlayIntent extends Intent {
-  const _TogglePlayIntent();
 }

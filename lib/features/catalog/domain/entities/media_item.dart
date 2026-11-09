@@ -23,7 +23,7 @@ class MediaItem extends Equatable {
 
   factory MediaItem.fromJson(Map<String, dynamic> json) {
     return MediaItem(
-      id: json['id']?.toString() ?? UniqueKey().toString(),
+      id: json['id']?.toString() ?? DateTime.now().microsecondsSinceEpoch.toString(),
       title: json['title'] ?? json['name'] ?? 'Título Desconhecido',
       overview: json['overview'] ?? json['description'],
       posterUrl: json['poster_url'] ?? json['poster'] ?? json['thumbnail'],
