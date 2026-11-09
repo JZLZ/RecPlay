@@ -1,0 +1,51 @@
+name: recplay
+description: "RecPlay - Agnostic cross-platform media management and adaptive playback ecosystem for Mobile and Android TV."
+publish_to: "none"
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.2.0 <4.0.0"
+  flutter: ">=3.16.0"
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # UI & Responsive / TV Leanback support
+  flutter_animate: ^4.5.0
+
+  # Architecture & State Management (Clean Architecture)
+  flutter_bloc: ^8.1.5
+  equatable: ^2.0.5
+  get_it: ^7.7.0
+
+  # Networking (Dynamic API consumption)
+  dio: ^5.4.3+1
+  connectivity_plus: ^6.0.3
+
+  # Secure Local Persistence
+  flutter_secure_storage: ^9.2.2
+  hive_flutter: ^1.1.0
+
+  # Device & Platform Identification (TV vs Smartphone)
+  device_info_plus: ^10.1.0
+
+  # Media Playback (HLS, DASH, MP4, Adaptive Streaming via ExoPlayer / libmpv)
+  media_kit: ^1.1.10
+  media_kit_video: ^1.2.4
+
+  # Data Parsing & Utilities
+  crypto: ^3.0.3
+  intl: ^0.19.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.2
+  bloc_test: ^9.1.7
+  mocktail: ^1.0.4
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/
