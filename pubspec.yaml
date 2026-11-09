@@ -30,9 +30,8 @@ dependencies:
   # Device & Platform Identification (TV vs Smartphone)
   device_info_plus: ^10.1.0
 
-  # Media Playback (HLS, DASH, MP4, Adaptive Streaming via ExoPlayer / libmpv)
-  media_kit: ^1.1.10
-  media_kit_video: ^1.2.4
+  # Media Playback (HLS, DASH, MP4 via ExoPlayer on Android/TV)
+  video_player: ^2.8.5
 
   # Data Parsing & Utilities
   crypto: ^3.0.3

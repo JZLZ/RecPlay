@@ -269,7 +269,19 @@ class _CatalogPageState extends State<CatalogPage> {
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 mainAxisAlignment: MainAxisAlignment.end,
                                 children: [
-                                  const Icon(Icons.play_circle_outline, color: AppTheme.primary, size: 36),
+                                  Expanded(
+                                    child: Center(
+                                      child: item.posterUrl != null && item.posterUrl!.isNotEmpty
+                                          ? Image.network(
+                                              item.posterUrl!,
+                                              fit: BoxFit.contain,
+                                              errorBuilder: (_, __, ___) =>
+                                                  const Icon(Icons.tv, color: AppTheme.primary, size: 36),
+                                            )
+                                          : const Icon(Icons.play_circle_outline,
+                                              color: AppTheme.primary, size: 36),
+                                    ),
+                                  ),
                                   const SizedBox(height: 8),
                                   Text(
                                     item.title,
@@ -359,7 +371,14 @@ class _CatalogPageState extends State<CatalogPage> {
                                       borderRadius: BorderRadius.circular(8),
                                     ),
                                     alignment: Alignment.center,
-                                    child: const Icon(Icons.movie, size: 36, color: Colors.white38),
+                                    child: item.posterUrl != null && item.posterUrl!.isNotEmpty
+                                        ? Image.network(
+                                            item.posterUrl!,
+                                            fit: BoxFit.contain,
+                                            errorBuilder: (_, __, ___) =>
+                                                const Icon(Icons.tv, size: 36, color: Colors.white38),
+                                          )
+                                        : const Icon(Icons.movie, size: 36, color: Colors.white38),
                                   ),
                                 ),
                                 const SizedBox(height: 8),
