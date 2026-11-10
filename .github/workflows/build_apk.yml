@@ -1,4 +1,4 @@
-name: Build Astra APK
+name: Build Astra APKs
 
 on:
   push:
@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    name: Build Android Release APK
+    name: Build Android Release APKs (Smartphone & Android TV)
     runs-on: ubuntu-latest
 
     steps:
@@ -26,15 +26,17 @@ jobs:
           channel: 'stable'
           cache: true
 
-      - name: Generate Android Project Skeleton (v2 Embedding)
+      - name: Generate Base Android Project Skeleton
         run: |
-          flutter create . --platforms=android --org=com.astra.tv
-          
-          # Garante que o AndroidManifest tenha suporte híbrido a Android TV (Leanback) e Smartphone
+          flutter create . --platforms=android --org=com.astra
+          flutter pub get
+
+      # ==================== 1. BUILD SMARTPHONE APK ====================
+      - name: Configure AndroidManifest for Smartphone
+        run: |
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
           <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-              <uses-feature android:name="android.software.leanback" android:required="false" />
-              <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+              <uses-feature android:name="android.hardware.touchscreen" android:required="true" />
               <uses-permission android:name="android.permission.INTERNET" />
               <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
               <uses-permission android:name="android.permission.WAKE_LOCK" />
@@ -55,6 +57,50 @@ jobs:
                       <intent-filter>
                           <action android:name="android.intent.action.MAIN"/>
                           <category android:name="android.intent.category.LAUNCHER"/>
+                      </intent-filter>
+                  </activity>
+                  <meta-data
+                      android:name="flutterEmbedding"
+                      android:value="2" />
+              </application>
+          </manifest>
+          EOF
+
+      - name: Build Smartphone Release APK
+        run: |
+          flutter build apk --release -t lib/main_mobile.dart
+          mkdir -p output_apks
+          cp build/app/outputs/flutter-apk/app-release.apk output_apks/Astra-Smartphone.apk
+
+      # ==================== 2. BUILD ANDROID TV APK ====================
+      - name: Configure AndroidManifest for Android TV (Leanback)
+        run: |
+          cat << 'EOF' > android/app/src/main/AndroidManifest.xml
+          <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+              <uses-feature android:name="android.software.leanback" android:required="true" />
+              <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+              <uses-permission android:name="android.permission.INTERNET" />
+              <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+              <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+              <application
+                  android:label="Astra TV"
+                  android:name="${applicationName}"
+                  android:icon="@mipmap/ic_launcher"
+                  android:banner="@mipmap/ic_launcher"
+                  android:usesCleartextTraffic="true">
+                  <activity
+                      android:name=".MainActivity"
+                      android:exported="true"
+                      android:launchMode="singleTop"
+                      android:theme="@style/LaunchTheme"
+                      android:screenOrientation="landscape"
+                      android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+                      android:hardwareAccelerated="true"
+                      android:windowSoftInputMode="adjustResize">
+                      <intent-filter>
+                          <action android:name="android.intent.action.MAIN"/>
+                          <category android:name="android.intent.category.LAUNCHER"/>
                           <category android:name="android.intent.category.LEANBACK_LAUNCHER"/>
                       </intent-filter>
                   </activity>
@@ -65,15 +111,14 @@ jobs:
           </manifest>
           EOF
 
-      - name: Install Dependencies
-        run: flutter pub get
+      - name: Build Android TV Release APK
+        run: |
+          flutter build apk --release -t lib/main_tv.dart
+          cp build/app/outputs/flutter-apk/app-release.apk output_apks/Astra-AndroidTV.apk
 
-      - name: Build Release APK
-        run: flutter build apk --release
-
-      - name: Upload APK Artifact
+      - name: Upload Both APK Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: Astra-release-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          name: Astra-APKs
+          path: output_apks/*.apk
           retention-days: 7

@@ -13,6 +13,7 @@ import '../widgets/astra_sidebar.dart';
 import '../widgets/astra_brand.dart';
 import '../widgets/astra_hero_backdrop.dart';
 import '../widgets/astra_media_card.dart';
+import '../widgets/astra_mobile_catalog.dart';
 import '../widgets/category_chips_bar.dart';
 import '../widgets/quick_zap_bar.dart';
 import '../widgets/series_episodes_modal.dart';
@@ -206,6 +207,20 @@ class _CatalogPageState extends State<CatalogPage> {
 
   @override
   Widget build(BuildContext context) {
+    if (!_isTv) {
+      return AstraMobileCatalog(
+        repository: widget.catalogRepository,
+        homeCategories: _homeCategories,
+        channelsCategories: _channelsCategories,
+        moviesCategories: _moviesCategories,
+        seriesCategories: _seriesCategories,
+        favoritesCategories: _favoritesCategories,
+        favoriteIds: _favoriteIds,
+        onToggleFavorite: _toggleFavorite,
+        onRefresh: () => _loadTabContent(_currentTab),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppTheme.background,
       body: Row(

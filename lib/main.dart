@@ -15,17 +15,23 @@ void main() async {
   // Inicializa o Service Locator (Clean Architecture)
   await di.initDependencies();
 
-  // Otimização de tela para Android TV e Mobile (Modo Imersivo)
+  // Otimização de tela (Modo Imersivo)
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
   runApp(const AstraApp());
 }
 
 class AstraApp extends StatelessWidget {
-  const AstraApp({super.key});
+  final DeviceType? forcedDeviceType;
+
+  const AstraApp({super.key, this.forcedDeviceType});
 
   @override
   Widget build(BuildContext context) {
+    if (forcedDeviceType != null) {
+      di.sl<DeviceDetector>().overrideDeviceType(forcedDeviceType!);
+    }
+
     return MultiBlocProvider(
       providers: [
         BlocProvider<AdminCubit>(
