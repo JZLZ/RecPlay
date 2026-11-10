@@ -4,7 +4,8 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/tv_focusable.dart';
 import '../../domain/entities/media_item.dart';
 import '../../data/repositories/catalog_repository.dart';
-import '../widgets/tv_media_card.dart';
+import '../widgets/astra_media_card.dart';
+import '../widgets/astra_brand.dart';
 import '../widgets/series_episodes_modal.dart';
 import '../../../player/presentation/pages/player_page.dart';
 
@@ -138,32 +139,38 @@ class _SearchPageState extends State<SearchPage> {
       body: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Lado Esquerdo: Barra de Busca + Teclado Virtual para Controle Remoto
+          // Lado Esquerdo: Barra de Busca + Teclado Virtual Astra D-Pad
           SizedBox(
             width: widget.isTv ? 340 : 300,
             child: Container(
               padding: const EdgeInsets.fromLTRB(20, 24, 16, 20),
               decoration: const BoxDecoration(
-                border: Border(right: BorderSide(color: Colors.white10, width: 1)),
+                border: Border(right: BorderSide(color: AppTheme.borderSubtle, width: 1)),
               ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Campo de Texto de Busca
+                  // Logo Astra na Busca
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 16),
+                    child: AstraBrand(size: 20),
+                  ),
+
+                  // Campo de Texto de Busca com Estilo Astra Glass
                   Container(
                     decoration: BoxDecoration(
-                      color: AppTheme.surfaceCard,
+                      color: AppTheme.slateGlass,
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white12),
+                      border: Border.all(color: AppTheme.borderSubtle),
                     ),
                     child: TextField(
                       controller: _textController,
                       focusNode: _inputFocusNode,
-                      style: const TextStyle(color: Colors.white, fontSize: 16),
+                      style: const TextStyle(color: Colors.white, fontSize: 15),
                       decoration: InputDecoration(
-                        hintText: 'Digite o título...',
-                        hintStyle: const TextStyle(color: AppTheme.textSecondary, fontSize: 14),
-                        prefixIcon: const Icon(Icons.search, color: AppTheme.primary, size: 20),
+                        hintText: 'Search Astra ecosystem...',
+                        hintStyle: const TextStyle(color: AppTheme.textMuted, fontSize: 13),
+                        prefixIcon: const Icon(Icons.search, color: AppTheme.cyan, size: 20),
                         suffixIcon: _textController.text.isNotEmpty
                             ? IconButton(
                                 icon: const Icon(Icons.clear, color: Colors.white70, size: 18),
@@ -178,7 +185,7 @@ class _SearchPageState extends State<SearchPage> {
                   ),
                   const SizedBox(height: 16),
 
-                  // Teclado D-Pad para TV
+                  // Teclado D-Pad Astra
                   Expanded(
                     child: ListView(
                       children: [
@@ -197,8 +204,9 @@ class _SearchPageState extends State<SearchPage> {
                                       child: Container(
                                         height: 40,
                                         decoration: BoxDecoration(
-                                          color: Colors.white.withOpacity(0.08),
+                                          color: Colors.white.withOpacity(0.06),
                                           borderRadius: BorderRadius.circular(8),
+                                          border: Border.all(color: Colors.white.withOpacity(0.08)),
                                         ),
                                         alignment: Alignment.center,
                                         child: Text(
@@ -206,7 +214,7 @@ class _SearchPageState extends State<SearchPage> {
                                           style: const TextStyle(
                                             color: Colors.white,
                                             fontWeight: FontWeight.bold,
-                                            fontSize: 16,
+                                            fontSize: 15,
                                           ),
                                         ),
                                       ),
@@ -234,16 +242,18 @@ class _SearchPageState extends State<SearchPage> {
                                   child: Container(
                                     height: 40,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.12),
+                                      color: Colors.white.withOpacity(0.10),
                                       borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.white.withOpacity(0.12)),
                                     ),
                                     alignment: Alignment.center,
                                     child: const Text(
-                                      'ESPAÇO',
+                                      'SPACE',
                                       style: TextStyle(
                                         color: Colors.white,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 12,
+                                        fontSize: 11,
+                                        letterSpacing: 1.0,
                                       ),
                                     ),
                                   ),
@@ -263,8 +273,9 @@ class _SearchPageState extends State<SearchPage> {
                                   child: Container(
                                     height: 40,
                                     decoration: BoxDecoration(
-                                      color: Colors.redAccent.withOpacity(0.2),
+                                      color: AppTheme.danger.withOpacity(0.18),
                                       borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: AppTheme.danger.withOpacity(0.35)),
                                     ),
                                     alignment: Alignment.center,
                                     child: const Icon(Icons.backspace_outlined, color: Colors.white, size: 18),
@@ -285,16 +296,18 @@ class _SearchPageState extends State<SearchPage> {
                                   child: Container(
                                     height: 40,
                                     decoration: BoxDecoration(
-                                      color: Colors.white.withOpacity(0.08),
+                                      color: Colors.white.withOpacity(0.06),
                                       borderRadius: BorderRadius.circular(8),
+                                      border: Border.all(color: Colors.white.withOpacity(0.08)),
                                     ),
                                     alignment: Alignment.center,
                                     child: const Text(
-                                      'LIMPAR',
+                                      'CLEAR',
                                       style: TextStyle(
-                                        color: Colors.white70,
+                                        color: AppTheme.textSecondary,
                                         fontWeight: FontWeight.bold,
-                                        fontSize: 11,
+                                        fontSize: 10,
+                                        letterSpacing: 0.8,
                                       ),
                                     ),
                                   ),
@@ -311,7 +324,7 @@ class _SearchPageState extends State<SearchPage> {
             ),
           ),
 
-          // Lado Direito: Grade de Resultados em Tempo Real
+          // Lado Direito: Grade de Resultados em Tempo Real Astra
           Expanded(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 24, 24, 0),
@@ -323,19 +336,20 @@ class _SearchPageState extends State<SearchPage> {
                     children: [
                       Text(
                         _textController.text.trim().isEmpty
-                            ? 'Resultados da Busca'
-                            : 'Resultados para "${_textController.text.trim()}" (${_results.length})',
+                            ? 'Search Results'
+                            : 'Results for "${_textController.text.trim()}" (${_results.length})',
                         style: const TextStyle(
                           fontSize: 20,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
+                          letterSpacing: -0.02,
                         ),
                       ),
                       if (_isSearching)
                         const SizedBox(
                           width: 20,
                           height: 20,
-                          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.primary),
+                          child: CircularProgressIndicator(strokeWidth: 2, color: AppTheme.cyan),
                         ),
                     ],
                   ),
@@ -347,10 +361,10 @@ class _SearchPageState extends State<SearchPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.search, size: 64, color: Colors.white24),
+                                Icon(Icons.search, size: 64, color: Colors.white12),
                                 SizedBox(height: 16),
                                 Text(
-                                  'Use o teclado à esquerda para pesquisar filmes, séries e canais',
+                                  'Search live channels, movies and series across Astra',
                                   style: TextStyle(color: AppTheme.textSecondary),
                                 ),
                               ],
@@ -361,10 +375,10 @@ class _SearchPageState extends State<SearchPage> {
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Icon(Icons.sentiment_dissatisfied, size: 64, color: Colors.white24),
+                                    Icon(Icons.sentiment_dissatisfied, size: 64, color: Colors.white12),
                                     SizedBox(height: 16),
                                     Text(
-                                      'Nenhum resultado encontrado.',
+                                      'No titles found.',
                                       style: TextStyle(color: AppTheme.textSecondary),
                                     ),
                                   ],
@@ -373,8 +387,8 @@ class _SearchPageState extends State<SearchPage> {
                             : GridView.builder(
                                 padding: const EdgeInsets.only(bottom: 24),
                                 gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                                  maxCrossAxisExtent: 170,
-                                  childAspectRatio: 0.68,
+                                  maxCrossAxisExtent: 180,
+                                  childAspectRatio: 0.70,
                                   crossAxisSpacing: 14,
                                   mainAxisSpacing: 14,
                                 ),
@@ -383,7 +397,7 @@ class _SearchPageState extends State<SearchPage> {
                                   final item = _results[idx];
                                   final isFav = _favoriteIds.contains(item.id);
 
-                                  return TvMediaCard(
+                                  return AstraMediaCard(
                                     item: item,
                                     isFavorite: isFav,
                                     width: double.infinity,

@@ -1,4 +1,6 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/tv_focusable.dart';
 import '../../../../core/device/device_detector.dart';
@@ -7,10 +9,12 @@ import '../../../admin/domain/repositories/api_config_repository.dart';
 import '../../../player/presentation/pages/player_page.dart';
 import '../../domain/entities/media_item.dart';
 import '../../data/repositories/catalog_repository.dart';
-import '../widgets/netflix_sidebar.dart';
-import '../widgets/tv_hero_backdrop.dart';
-import '../widgets/tv_media_card.dart';
+import '../widgets/astra_sidebar.dart';
+import '../widgets/astra_brand.dart';
+import '../widgets/astra_hero_backdrop.dart';
+import '../widgets/astra_media_card.dart';
 import '../widgets/category_chips_bar.dart';
+import '../widgets/quick_zap_bar.dart';
 import '../widgets/series_episodes_modal.dart';
 import 'search_page.dart';
 
@@ -35,27 +39,47 @@ class _CatalogPageState extends State<CatalogPage> {
   bool _isTv = false;
   CatalogNavTab _currentTab = CatalogNavTab.home;
   
-  // Dados de cada seção
+  // Categorias de cada aba
   List<MediaCategory> _homeCategories = [];
   List<MediaCategory> _channelsCategories = [];
   List<MediaCategory> _moviesCategories = [];
   List<MediaCategory> _seriesCategories = [];
   List<MediaCategory> _favoritesCategories = [];
 
-  // Filtros de chips
+  // Filtros rápidos
   String _selectedChannelFilter = '★ Todos';
   String _selectedMovieFilter = '★ Todos';
   String _selectedSeriesFilter = '★ Todos';
 
-  // Item atualmente em foco para Hero Backdrop
+  // Item selecionado para o Hero Backdrop
   MediaItem? _selectedItemForPreview;
   final Set<String> _favoriteIds = {};
   int _secretTapCount = 0;
 
+  // Relógio do Header TV (do Figma)
+  late Timer _clockTimer;
+  String _currentTime = '';
+
   @override
   void initState() {
     super.initState();
+    _updateClock();
+    _clockTimer = Timer.periodic(const Duration(seconds: 30), (_) => _updateClock());
     _initDeviceAndData();
+  }
+
+  void _updateClock() {
+    if (mounted) {
+      setState(() {
+        _currentTime = DateFormat('HH:mm').format(DateTime.now());
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _clockTimer.cancel();
+    super.dispose();
   }
 
   Future<void> _initDeviceAndData() async {
@@ -69,7 +93,7 @@ class _CatalogPageState extends State<CatalogPage> {
   Future<void> _loadTabContent(CatalogNavTab tab) async {
     setState(() => _isLoading = true);
 
-    // Carrega IDs favoritos
+    // Carrega favoritos salvos
     final favList = await widget.catalogRepository.getFavorites();
     if (mounted) {
       _favoriteIds.clear();
@@ -115,7 +139,6 @@ class _CatalogPageState extends State<CatalogPage> {
         break;
 
       case CatalogNavTab.search:
-        // A tela de busca gerencia seus próprios estados
         break;
     }
 
@@ -141,7 +164,6 @@ class _CatalogPageState extends State<CatalogPage> {
           _favoriteIds.remove(item.id);
         }
       });
-      // Atualiza lista de favoritos se estiver na aba
       if (_currentTab == CatalogNavTab.favorites || _currentTab == CatalogNavTab.home) {
         final favList = await widget.catalogRepository.getFavorites();
         setState(() {
@@ -188,35 +210,97 @@ class _CatalogPageState extends State<CatalogPage> {
       backgroundColor: AppTheme.background,
       body: Row(
         children: [
-          // 1. Menu Lateral Retrátil Estilo Netflix
-          NetflixSidebar(
+          // 1. Barra Lateral Astra (Figma TV Nav)
+          AstraSidebar(
             currentTab: _currentTab,
             onTabSelected: _onTabSelected,
             onAdminPressed: _openAdminPanel,
           ),
 
-          // 2. Conteúdo Central de Acordo com a Aba Selecionada
+          // 2. Painel Central de Conteúdo
           Expanded(
-            child: _currentTab == CatalogNavTab.search
-                ? SearchPage(
-                    repository: widget.catalogRepository,
-                    isTv: _isTv,
-                  )
-                : _isLoading
-                    ? const Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
+            child: Stack(
+              children: [
+                // Header com Relógio e Indicador LIVE (Do Design Figma)
+                if (_currentTab != CatalogNavTab.search)
+                  Positioned(
+                    top: 20,
+                    left: 36,
+                    right: 36,
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Row(
                           children: [
-                            CircularProgressIndicator(color: AppTheme.primary),
-                            SizedBox(height: 16),
+                            AstraLiveDot(size: 7),
+                            SizedBox(width: 8),
                             Text(
-                              'Sincronizando catálogo Netflix...',
-                              style: TextStyle(color: AppTheme.textSecondary),
+                              'LIVE',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 11,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 1.5,
+                              ),
                             ),
                           ],
                         ),
-                      )
-                    : _buildCurrentTabContent(),
+                        Row(
+                          children: [
+                            Text(
+                              _currentTime,
+                              style: const TextStyle(
+                                color: Color(0xFFCBD5E1),
+                                fontSize: 14,
+                                fontWeight: FontWeight.w700,
+                                fontFeatures: [FontFeature.tabularFigures()],
+                              ),
+                            ),
+                            const SizedBox(width: 16),
+                            TvFocusable(
+                              onPressed: _openAdminPanel,
+                              borderRadius: BorderRadius.circular(50),
+                              child: Container(
+                                padding: const EdgeInsets.all(7),
+                                decoration: BoxDecoration(
+                                  color: Colors.white.withOpacity(0.06),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: const Icon(Icons.settings_outlined, color: AppTheme.textSecondary, size: 18),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
+                  ),
+
+                // Conteúdo da Aba
+                Positioned.fill(
+                  top: _currentTab == CatalogNavTab.search ? 0 : 54,
+                  child: _currentTab == CatalogNavTab.search
+                      ? SearchPage(
+                          repository: widget.catalogRepository,
+                          isTv: _isTv,
+                        )
+                      : _isLoading
+                          ? const Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  CircularProgressIndicator(color: AppTheme.cyan),
+                                  SizedBox(height: 16),
+                                  Text(
+                                    'Carregando ecossistema Astra...',
+                                    style: TextStyle(color: AppTheme.textSecondary),
+                                  ),
+                                ],
+                              ),
+                            )
+                          : _buildCurrentTabContent(),
+                ),
+              ],
+            ),
           ),
         ],
       ),
@@ -226,16 +310,16 @@ class _CatalogPageState extends State<CatalogPage> {
   Widget _buildCurrentTabContent() {
     switch (_currentTab) {
       case CatalogNavTab.home:
-        return _buildCategoriesView(_homeCategories);
+        return _buildHomeView();
 
       case CatalogNavTab.channels:
-        return _buildFilteredChannelsView();
+        return _buildChannelsView();
 
       case CatalogNavTab.movies:
-        return _buildFilteredMoviesView();
+        return _buildMoviesView();
 
       case CatalogNavTab.series:
-        return _buildFilteredSeriesView();
+        return _buildSeriesView();
 
       case CatalogNavTab.favorites:
         return _buildFavoritesView();
@@ -245,21 +329,21 @@ class _CatalogPageState extends State<CatalogPage> {
     }
   }
 
-  // ==================== VISÃO GERAL DE CATEGORIAS (INÍCIO) ====================
-  Widget _buildCategoriesView(List<MediaCategory> categories) {
-    if (categories.isEmpty) {
+  // ==================== 1. ABA INÍCIO (HOME) ====================
+  Widget _buildHomeView() {
+    if (_homeCategories.isEmpty) {
       return _buildEmptyState();
     }
 
     return Stack(
       children: [
-        // Hero Backdrop Dinâmico
+        // Hero Backdrop no Topo
         Positioned(
           top: 0,
           left: 0,
           right: 0,
           height: 380,
-          child: TvHeroBackdrop(
+          child: AstraHeroBackdrop(
             item: _selectedItemForPreview,
             isFavorite: _selectedItemForPreview != null &&
                 _favoriteIds.contains(_selectedItemForPreview!.id),
@@ -284,10 +368,13 @@ class _CatalogPageState extends State<CatalogPage> {
           top: 310,
           child: ListView.builder(
             padding: const EdgeInsets.only(left: 36, bottom: 48),
-            itemCount: categories.length,
+            itemCount: _homeCategories.length,
             itemBuilder: (context, catIdx) {
-              final cat = categories[catIdx];
-              return _buildCarouselRow(cat, catIdx);
+              final cat = _homeCategories[catIdx];
+              final isRanked = cat.title.toLowerCase().contains('alta') ||
+                  cat.title.toLowerCase().contains('top');
+
+              return _buildCarouselRow(cat, catIdx, isRanked: isRanked);
             },
           ),
         ),
@@ -295,8 +382,8 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  // ==================== CANAIS COM FILTROS DE CHIPS ====================
-  Widget _buildFilteredChannelsView() {
+  // ==================== 2. ABA CANAIS (TV CHANNELS) ====================
+  Widget _buildChannelsView() {
     final chips = [
       '★ Todos',
       '⚽ Esportes',
@@ -309,10 +396,10 @@ class _CatalogPageState extends State<CatalogPage> {
       '🌐 Internacionais',
     ];
 
-    List<MediaCategory> visibleCategories = _channelsCategories;
+    List<MediaCategory> visible = _channelsCategories;
     if (_selectedChannelFilter != '★ Todos') {
       final cleanFilter = _selectedChannelFilter.replaceAll(RegExp(r'[^a-zA-Z0-9& ]'), '').trim();
-      visibleCategories = _channelsCategories.where((cat) {
+      visible = _channelsCategories.where((cat) {
         return cat.title.toLowerCase().contains(cleanFilter.toLowerCase());
       }).toList();
     }
@@ -320,20 +407,19 @@ class _CatalogPageState extends State<CatalogPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 24),
-        // Chips de Filtro Rápido
+        // Barra de Chips
         CategoryChipsBar(
           categories: chips,
           selectedCategory: _selectedChannelFilter,
-          onSelected: (chip) {
-            setState(() => _selectedChannelFilter = chip);
-          },
+          onSelected: (chip) => setState(() => _selectedChannelFilter = chip),
         ),
-        const SizedBox(height: 12),
 
-        // Conteúdo
+        // Quick Zap Bar (Design do Figma)
+        QuickZapBar(currentItem: _selectedItemForPreview),
+
+        // Lista de Carrosséis de Canais
         Expanded(
-          child: visibleCategories.isEmpty
+          child: visible.isEmpty
               ? const Center(
                   child: Text(
                     'Nenhum canal encontrado nesta categoria.',
@@ -341,10 +427,10 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.only(left: 36, bottom: 48, top: 12),
-                  itemCount: visibleCategories.length,
+                  padding: const EdgeInsets.only(left: 36, bottom: 48, top: 8),
+                  itemCount: visible.length,
                   itemBuilder: (context, catIdx) {
-                    final cat = visibleCategories[catIdx];
+                    final cat = visible[catIdx];
                     return _buildCarouselRow(cat, catIdx);
                   },
                 ),
@@ -353,8 +439,8 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  // ==================== FILMES COM FILTROS DE CHIPS ====================
-  Widget _buildFilteredMoviesView() {
+  // ==================== 3. ABA FILMES (MOVIES) ====================
+  Widget _buildMoviesView() {
     final chips = [
       '★ Todos',
       '💥 Ação',
@@ -378,15 +464,12 @@ class _CatalogPageState extends State<CatalogPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 24),
         CategoryChipsBar(
           categories: chips,
           selectedCategory: _selectedMovieFilter,
-          onSelected: (chip) {
-            setState(() => _selectedMovieFilter = chip);
-          },
+          onSelected: (chip) => setState(() => _selectedMovieFilter = chip),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
         Expanded(
           child: visible.isEmpty
@@ -397,7 +480,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.only(left: 36, bottom: 48, top: 12),
+                  padding: const EdgeInsets.only(left: 36, bottom: 48, top: 8),
                   itemCount: visible.length,
                   itemBuilder: (context, catIdx) {
                     final cat = visible[catIdx];
@@ -409,8 +492,8 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  // ==================== SÉRIES COM FILTROS DE CHIPS ====================
-  Widget _buildFilteredSeriesView() {
+  // ==================== 4. ABA SÉRIES (SERIES) ====================
+  Widget _buildSeriesView() {
     final chips = [
       '★ Todos',
       '💥 Action & Adventure',
@@ -432,15 +515,12 @@ class _CatalogPageState extends State<CatalogPage> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(height: 24),
         CategoryChipsBar(
           categories: chips,
           selectedCategory: _selectedSeriesFilter,
-          onSelected: (chip) {
-            setState(() => _selectedSeriesFilter = chip);
-          },
+          onSelected: (chip) => setState(() => _selectedSeriesFilter = chip),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 10),
 
         Expanded(
           child: visible.isEmpty
@@ -451,7 +531,7 @@ class _CatalogPageState extends State<CatalogPage> {
                   ),
                 )
               : ListView.builder(
-                  padding: const EdgeInsets.only(left: 36, bottom: 48, top: 12),
+                  padding: const EdgeInsets.only(left: 36, bottom: 48, top: 8),
                   itemCount: visible.length,
                   itemBuilder: (context, catIdx) {
                     final cat = visible[catIdx];
@@ -463,7 +543,7 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  // ==================== ABA DE FAVORITOS ====================
+  // ==================== 5. ABA FAVORITOS ====================
   Widget _buildFavoritesView() {
     if (_favoritesCategories.isEmpty || _favoritesCategories.first.items.isEmpty) {
       return Center(
@@ -476,12 +556,12 @@ class _CatalogPageState extends State<CatalogPage> {
               Icon(Icons.star_border, size: 72, color: Colors.amber),
               SizedBox(height: 20),
               Text(
-                'Sua Lista está Vazia',
+                'Sua Lista Astra está Vazia',
                 style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
               ),
               SizedBox(height: 12),
               Text(
-                'Navegue pelos canais, filmes e séries e marque o botão de estrela (⭐) para adicioná-los aos seus favoritos e acessá-los rapidamente aqui.',
+                'Adicione canais, filmes e séries aos seus favoritos selecionando o botão de estrela para acessá-los instantaneamente aqui.',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppTheme.textSecondary, height: 1.4),
               ),
@@ -493,34 +573,34 @@ class _CatalogPageState extends State<CatalogPage> {
 
     final items = _favoritesCategories.first.items;
     return Padding(
-      padding: const EdgeInsets.fromLTRB(36, 32, 36, 24),
+      padding: const EdgeInsets.fromLTRB(36, 16, 36, 24),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Row(
             children: [
-              const Icon(Icons.star, color: Colors.amber, size: 28),
-              const SizedBox(width: 12),
+              const Icon(Icons.star, color: Colors.amber, size: 26),
+              const SizedBox(width: 10),
               Text(
-                'Seus Favoritos (${items.length})',
-                style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold, color: Colors.white),
+                'Favorites (${items.length})',
+                style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white),
               ),
             ],
           ),
-          const SizedBox(height: 24),
+          const SizedBox(height: 20),
 
           Expanded(
             child: GridView.builder(
               gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                 maxCrossAxisExtent: 180,
-                childAspectRatio: 0.68,
-                crossAxisSpacing: 16,
-                mainAxisSpacing: 16,
+                childAspectRatio: 0.70,
+                crossAxisSpacing: 14,
+                mainAxisSpacing: 14,
               ),
               itemCount: items.length,
               itemBuilder: (context, idx) {
                 final item = items[idx];
-                return TvMediaCard(
+                return AstraMediaCard(
                   item: item,
                   isFavorite: true,
                   width: double.infinity,
@@ -536,24 +616,25 @@ class _CatalogPageState extends State<CatalogPage> {
     );
   }
 
-  // ==================== CARROSSEL DE ITENS ====================
-  Widget _buildCarouselRow(MediaCategory cat, int catIdx) {
+  // ==================== CARROSSEL DE CARDS ASTRA ====================
+  Widget _buildCarouselRow(MediaCategory cat, int catIdx, {bool isRanked = false}) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.only(bottom: 12, top: 8),
+          padding: const EdgeInsets.only(bottom: 12, top: 12),
           child: Text(
             cat.title,
             style: const TextStyle(
-              fontSize: 18,
+              fontSize: 16,
               fontWeight: FontWeight.bold,
               color: Colors.white,
+              letterSpacing: -0.02,
             ),
           ),
         ),
         SizedBox(
-          height: 180,
+          height: 190,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
             itemCount: cat.items.length,
@@ -561,11 +642,12 @@ class _CatalogPageState extends State<CatalogPage> {
               final item = cat.items[itemIdx];
               final isFav = _favoriteIds.contains(item.id);
 
-              return TvMediaCard(
+              return AstraMediaCard(
                 item: item,
                 isFavorite: isFav,
-                width: 130,
-                height: 180,
+                rank: isRanked ? (itemIdx + 1) : null,
+                width: 135,
+                height: 190,
                 autofocus: catIdx == 0 && itemIdx == 0,
                 onFocused: () {
                   setState(() => _selectedItemForPreview = item);
@@ -579,7 +661,7 @@ class _CatalogPageState extends State<CatalogPage> {
             },
           ),
         ),
-        const SizedBox(height: 20),
+        const SizedBox(height: 14),
       ],
     );
   }
@@ -596,7 +678,7 @@ class _CatalogPageState extends State<CatalogPage> {
             const Icon(Icons.cloud_off_outlined, size: 72, color: AppTheme.textSecondary),
             const SizedBox(height: 20),
             const Text(
-              'Nenhuma API Conectada',
+              'Nenhuma API Conectada ao Astra',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 12),
@@ -612,15 +694,21 @@ class _CatalogPageState extends State<CatalogPage> {
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
                 decoration: BoxDecoration(
-                  color: AppTheme.primary,
+                  color: AppTheme.cyan,
                   borderRadius: BorderRadius.circular(10),
                 ),
                 child: const Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Icons.settings, color: Colors.white),
+                    Icon(Icons.settings, color: Color(0xFF061014)),
                     SizedBox(width: 8),
-                    Text('Abrir Ajustes / Painel Admin', style: TextStyle(fontWeight: FontWeight.bold)),
+                    Text(
+                      'Abrir Ajustes Astra',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF061014),
+                      ),
+                    ),
                   ],
                 ),
               ),

@@ -18,11 +18,11 @@ void main() async {
   // Otimização de tela para Android TV e Mobile (Modo Imersivo)
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-  runApp(const RecPlayApp());
+  runApp(const AstraApp());
 }
 
-class RecPlayApp extends StatelessWidget {
-  const RecPlayApp({super.key});
+class AstraApp extends StatelessWidget {
+  const AstraApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -33,7 +33,7 @@ class RecPlayApp extends StatelessWidget {
         ),
       ],
       child: MaterialApp(
-        title: 'RecPlay',
+        title: 'Astra',
         debugShowCheckedModeBanner: false,
         theme: AppTheme.darkTheme,
         home: CatalogPage(

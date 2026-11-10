@@ -3,7 +3,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../core/widgets/tv_focusable.dart';
 import '../../domain/entities/media_item.dart';
 
-class TvHeroBackdrop extends StatelessWidget {
+class AstraHeroBackdrop extends StatelessWidget {
   final MediaItem? item;
   final bool isFavorite;
   final VoidCallback onPlay;
@@ -11,14 +11,14 @@ class TvHeroBackdrop extends StatelessWidget {
   final VoidCallback? onOpenEpisodes;
   final double height;
 
-  const TvHeroBackdrop({
+  const AstraHeroBackdrop({
     super.key,
     required this.item,
     required this.isFavorite,
     required this.onPlay,
     required this.onToggleFavorite,
     this.onOpenEpisodes,
-    this.height = 360,
+    this.height = 380,
   });
 
   @override
@@ -37,9 +37,9 @@ class TvHeroBackdrop extends StatelessWidget {
       child: Stack(
         fit: StackFit.expand,
         children: [
-          // 1. Imagem de Fundo com Transição Suave (CrossFade)
+          // 1. Imagem de Fundo em Alta Resolução com Transição Suave
           AnimatedSwitcher(
-            duration: const Duration(milliseconds: 450),
+            duration: const Duration(milliseconds: 400),
             child: backdrop != null && backdrop.isNotEmpty
                 ? Image.network(
                     backdrop,
@@ -47,19 +47,19 @@ class TvHeroBackdrop extends StatelessWidget {
                     fit: BoxFit.cover,
                     width: double.infinity,
                     height: height,
-                    errorBuilder: (_, __, ___) => Container(color: AppTheme.surface),
+                    errorBuilder: (_, __, ___) => Container(color: AppTheme.obsidian),
                   )
-                : Container(key: const ValueKey('placeholder'), color: AppTheme.surface),
+                : Container(key: const ValueKey('placeholder'), color: AppTheme.obsidian),
           ),
 
-          // 2. Gradiente Horizontal (escurece lado esquerdo para texto)
+          // 2. Gradiente Horizontal (Astra Left Shade)
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
                 begin: Alignment.centerLeft,
                 end: Alignment.centerRight,
                 colors: [
-                  AppTheme.background.withOpacity(0.96),
+                  AppTheme.background.withOpacity(0.97),
                   AppTheme.background.withOpacity(0.85),
                   AppTheme.background.withOpacity(0.3),
                   Colors.transparent,
@@ -69,7 +69,7 @@ class TvHeroBackdrop extends StatelessWidget {
             ),
           ),
 
-          // 3. Gradiente Vertical (funde o banner suavemente com a grade inferior)
+          // 3. Gradiente Vertical (Astra Bottom Shade)
           Container(
             decoration: BoxDecoration(
               gradient: LinearGradient(
@@ -77,73 +77,79 @@ class TvHeroBackdrop extends StatelessWidget {
                 end: Alignment.bottomCenter,
                 colors: [
                   Colors.transparent,
-                  AppTheme.background.withOpacity(0.7),
+                  AppTheme.background.withOpacity(0.6),
                   AppTheme.background,
                 ],
-                stops: const [0.5, 0.85, 1.0],
+                stops: const [0.35, 0.8, 1.0],
               ),
             ),
           ),
 
-          // 4. Informações do Item Focado + Botões de Ação Rápida
+          // 4. Conteúdo Hero Tipografia Astra
           Positioned(
             left: 36,
-            top: 32,
+            top: 24,
             bottom: 24,
-            width: 580,
+            width: 620,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               mainAxisAlignment: MainAxisAlignment.end,
               children: [
-                // Tags e Badges
+                // Badges (4K HDR, IMDb, etc. do Figma)
                 Row(
                   children: [
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: isChannel ? Colors.redAccent : AppTheme.primary,
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        isChannel ? 'CANAL AO VIVO' : (isSeries ? 'SÉRIE' : 'FILME'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 11,
-                          fontWeight: FontWeight.w900,
-                          letterSpacing: 1.1,
-                        ),
-                      ),
-                    ),
-                    if (current.year != null && current.year!.isNotEmpty) ...[
-                      const SizedBox(width: 10),
-                      Text(
-                        current.year!,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
+                    _buildPillBadge('4K HDR'),
+                    const SizedBox(width: 6),
+                    _buildPillBadge(isChannel ? 'LIVE FEED' : 'IMDb 8.5'),
+                    const SizedBox(width: 6),
+                    _buildPillBadge('16+'),
                   ],
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 10),
 
-                // Título Principal
+                // Eyebrow Tag (ex: ASTRA ORIGINAL)
                 Text(
-                  current.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
+                  isChannel
+                      ? 'ASTRA LIVE TV'
+                      : (isSeries ? 'ASTRA SERIES' : 'ASTRA ORIGINAL'),
                   style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 32,
-                    fontWeight: FontWeight.w900,
-                    height: 1.15,
+                    color: AppTheme.cyan,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                    letterSpacing: 2.6,
                   ),
                 ),
                 const SizedBox(height: 8),
 
-                // Sinopse / Overview
+                // Título em Caixa Alta e Peso Forte
+                Text(
+                  current.title.toUpperCase(),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 34,
+                    fontWeight: FontWeight.w900,
+                    height: 1.05,
+                    letterSpacing: -1.0,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Meta Info (Ano · Categoria · Duração)
+                Text(
+                  isChannel
+                      ? 'Transmissão Oficial ao Vivo · Sem Interrupções'
+                      : '${current.year ?? '2026'} · ${isSeries ? 'Série' : 'Filme'} · Áudio 5.1 Dolby',
+                  style: const TextStyle(
+                    color: Color(0xFFB4BDCA),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+
+                // Sinopse
                 if (current.overview != null && current.overview!.isNotEmpty)
                   Text(
                     current.overview!,
@@ -151,53 +157,62 @@ class TvHeroBackdrop extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
                       color: AppTheme.textSecondary,
-                      fontSize: 14,
-                      height: 1.3,
+                      fontSize: 13,
+                      height: 1.35,
                     ),
                   ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 18),
 
                 // Botões de Ação
                 Row(
                   children: [
-                    // Botão Assistir
+                    // Botão Play Now Primário (Ciano Neon Astra)
                     TvFocusable(
                       onPressed: onPlay,
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 12),
                         decoration: BoxDecoration(
-                          color: AppTheme.primary,
+                          color: AppTheme.cyan,
                           borderRadius: BorderRadius.circular(8),
+                          boxShadow: [
+                            BoxShadow(
+                              color: AppTheme.cyan.withOpacity(0.35),
+                              blurRadius: 18,
+                              offset: const Offset(0, 4),
+                            ),
+                          ],
                         ),
                         child: const Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Icon(Icons.play_arrow, color: Colors.white, size: 22),
+                            Icon(Icons.play_arrow, color: Color(0xFF061014), size: 22),
                             SizedBox(width: 8),
                             Text(
-                              'Assistir',
+                              'Play Now',
                               style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF061014),
+                                fontSize: 13,
+                                fontWeight: FontWeight.w800,
+                                letterSpacing: 0.5,
                               ),
                             ),
                           ],
                         ),
                       ),
                     ),
-                    const SizedBox(width: 14),
+                    const SizedBox(width: 12),
 
-                    // Botão Favoritar (⭐)
+                    // Botão Secundário Favoritar (Glass)
                     TvFocusable(
                       onPressed: onToggleFavorite,
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                         decoration: BoxDecoration(
-                          color: Colors.white.withOpacity(0.12),
+                          color: const Color(0xFF1A1E29).withOpacity(0.85),
                           borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.white.withOpacity(0.15)),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
@@ -205,15 +220,15 @@ class TvHeroBackdrop extends StatelessWidget {
                             Icon(
                               isFavorite ? Icons.star : Icons.star_border,
                               color: isFavorite ? Colors.amber : Colors.white,
-                              size: 20,
+                              size: 19,
                             ),
                             const SizedBox(width: 8),
                             Text(
-                              isFavorite ? 'Favorito' : 'Favoritar',
+                              isFavorite ? 'Saved' : 'Add to List',
                               style: TextStyle(
                                 color: isFavorite ? Colors.amber : Colors.white,
-                                fontSize: 14,
-                                fontWeight: FontWeight.bold,
+                                fontSize: 13,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ],
@@ -221,29 +236,30 @@ class TvHeroBackdrop extends StatelessWidget {
                       ),
                     ),
 
-                    // Botão de Episódios se for Série
+                    // Botão de Episódios se Série
                     if (isSeries && onOpenEpisodes != null) ...[
-                      const SizedBox(width: 14),
+                      const SizedBox(width: 12),
                       TvFocusable(
                         onPressed: onOpenEpisodes,
                         borderRadius: BorderRadius.circular(8),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                           decoration: BoxDecoration(
-                            color: Colors.white.withOpacity(0.12),
+                            color: const Color(0xFF1A1E29).withOpacity(0.85),
                             borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.white.withOpacity(0.15)),
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Icon(Icons.format_list_bulleted, color: Colors.white, size: 20),
+                              Icon(Icons.grid_view, color: Colors.white, size: 18),
                               SizedBox(width: 8),
                               Text(
-                                'Episódios',
+                                'Episodes',
                                 style: TextStyle(
                                   color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
                             ],
@@ -257,6 +273,26 @@ class TvHeroBackdrop extends StatelessWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPillBadge(String label) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFF0A0C10).withOpacity(0.6),
+        borderRadius: BorderRadius.circular(4),
+        border: Border.all(color: Colors.white.withOpacity(0.25), width: 1),
+      ),
+      child: Text(
+        label,
+        style: const TextStyle(
+          color: Colors.white,
+          fontSize: 9,
+          fontWeight: FontWeight.w800,
+          letterSpacing: 0.4,
+        ),
       ),
     );
   }

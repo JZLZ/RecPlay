@@ -1,4 +1,4 @@
-name: Build RecPlay APK
+name: Build Astra APK
 
 on:
   push:
@@ -28,7 +28,7 @@ jobs:
 
       - name: Generate Android Project Skeleton (v2 Embedding)
         run: |
-          flutter create . --platforms=android --org=com.recplay
+          flutter create . --platforms=android --org=com.astra.tv
           
           # Garante que o AndroidManifest tenha suporte híbrido a Android TV (Leanback) e Smartphone
           cat << 'EOF' > android/app/src/main/AndroidManifest.xml
@@ -40,7 +40,7 @@ jobs:
               <uses-permission android:name="android.permission.WAKE_LOCK" />
 
               <application
-                  android:label="RecPlay"
+                  android:label="Astra"
                   android:name="${applicationName}"
                   android:icon="@mipmap/ic_launcher"
                   android:usesCleartextTraffic="true">
@@ -74,6 +74,6 @@ jobs:
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: RecPlay-release-apk
+          name: Astra-release-apk
           path: build/app/outputs/flutter-apk/app-release.apk
           retention-days: 7

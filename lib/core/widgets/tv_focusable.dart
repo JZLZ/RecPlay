@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../theme/app_theme.dart';
 
 class TvFocusable extends StatefulWidget {
   final Widget child;
@@ -11,6 +12,7 @@ class TvFocusable extends StatefulWidget {
   final double scaleFactor;
   final EdgeInsets padding;
   final Color? glowColor;
+  final Color? focusedBorderColor;
 
   const TvFocusable({
     super.key,
@@ -19,10 +21,11 @@ class TvFocusable extends StatefulWidget {
     this.onFocusChange,
     this.focusNode,
     this.autofocus = false,
-    this.borderRadius = const BorderRadius.all(Radius.circular(12)),
-    this.scaleFactor = 1.08,
+    this.borderRadius = const BorderRadius.all(Radius.circular(10)),
+    this.scaleFactor = 1.06,
     this.padding = EdgeInsets.zero,
     this.glowColor,
+    this.focusedBorderColor,
   });
 
   @override
@@ -64,7 +67,8 @@ class _TvFocusableState extends State<TvFocusable> {
 
   @override
   Widget build(BuildContext context) {
-    final effectiveGlowColor = widget.glowColor ?? Theme.of(context).colorScheme.primary;
+    final effectiveGlowColor = widget.glowColor ?? AppTheme.cyan;
+    final effectiveBorderColor = widget.focusedBorderColor ?? AppTheme.cyan;
 
     return Padding(
       padding: widget.padding,
@@ -105,15 +109,15 @@ class _TvFocusableState extends State<TvFocusable> {
               decoration: BoxDecoration(
                 borderRadius: widget.borderRadius,
                 border: Border.all(
-                  color: _isFocused ? Colors.white : Colors.transparent,
-                  width: _isFocused ? 2.5 : 0.0,
+                  color: _isFocused ? effectiveBorderColor : Colors.transparent,
+                  width: _isFocused ? 2.0 : 0.0,
                 ),
                 boxShadow: _isFocused
                     ? [
                         BoxShadow(
-                          color: effectiveGlowColor.withOpacity(0.65),
-                          blurRadius: 18,
-                          spreadRadius: 3,
+                          color: effectiveGlowColor.withOpacity(0.35),
+                          blurRadius: 24,
+                          spreadRadius: 2,
                         ),
                       ]
                     : [],
