@@ -17,6 +17,9 @@ class CatalogRepository {
   List<MediaCategory>? _cachedSeries;
   List<MediaCategory>? _cachedAnimes;
   final Map<String, MediaItem> _allItemsMap = {};
+  final Set<String> _knownSeriesIds = {};
+  final Set<String> _knownMovieIds = {};
+  final Map<String, Map<String, String>> _episodeRawUrls = {};
 
   CatalogRepository({
     required DynamicApiClient apiClient,
@@ -383,10 +386,15 @@ class CatalogRepository {
       );
 
       final html = resp.data?.toString() ?? '';
-      final matches = RegExp(r'episode:\s*\{([^}]+)\}').allMatches(html);
 
-      for (final m in matches) {
-        final content = m.group(1) ?? '';
+      // Tenta regex completa com extração de players (br e eng)
+      final epDivRegex = RegExp(r'''onclick=['"]loadPlayers\(\{\s*br:\s*['"]([^'"]*)['"],\s*eng:\s*['"]([^'"]*)['"],.*?episode:\s*\{([^}]+)\}''', dotAll: true);
+      final epMatches = epDivRegex.allMatches(html);
+
+      for (final m in epMatches) {
+        final brStr = m.group(1) ?? '';
+        final engStr = m.group(2) ?? '';
+        final content = m.group(3) ?? '';
         final idMatch = RegExp(r'''id:\s*['"]([^'"]+)['"]''').firstMatch(content);
         final titleMatch = RegExp(r'''title:\s*['"]([^'"]+)['"]''').firstMatch(content);
         final epNumMatch = RegExp(r'''episode_num:\s*['"]([^'"]+)['"]''').firstMatch(content);
@@ -396,6 +404,11 @@ class CatalogRepository {
         final title = titleMatch?.group(1) ?? 'Episódio ${episodes.length + 1}';
         final epNum = int.tryParse(epNumMatch?.group(1) ?? '') ?? (episodes.length + 1);
         final poster = posterMatch?.group(1);
+
+        _episodeRawUrls[id] = {
+          'br': brStr,
+          'eng': engStr,
+        };
 
         final epItem = MediaItem(
           id: id,
@@ -413,12 +426,341 @@ class CatalogRepository {
         _allItemsMap[epItem.id] = epItem;
         episodes.add(epItem);
       }
+
+      // Fallback para caso o formato do HTML seja diferente
+      if (episodes.isEmpty) {
+        final matches = RegExp(r'episode:\s*\{([^}]+)\}').allMatches(html);
+        for (final m in matches) {
+          final content = m.group(1) ?? '';
+          final idMatch = RegExp(r'''id:\s*['"]([^'"]+)['"]''').firstMatch(content);
+          final titleMatch = RegExp(r'''title:\s*['"]([^'"]+)['"]''').firstMatch(content);
+          final epNumMatch = RegExp(r'''episode_num:\s*['"]([^'"]+)['"]''').firstMatch(content);
+          final posterMatch = RegExp(r'''poster:\s*['"]([^'"]+)['"]''').firstMatch(content);
+
+          final id = idMatch?.group(1) ?? 'ep_${seriesId}_${season}_${episodes.length + 1}';
+          final title = titleMatch?.group(1) ?? 'Episódio ${episodes.length + 1}';
+          final epNum = int.tryParse(epNumMatch?.group(1) ?? '') ?? (episodes.length + 1);
+          final poster = posterMatch?.group(1);
+
+          final epItem = MediaItem(
+            id: id,
+            title: '$season x $epNum - $title',
+            overview: 'Temporada $season • Episódio $epNum',
+            posterUrl: poster,
+            backdropUrl: poster,
+            seriesId: seriesId,
+            seasonNum: season,
+            episodeNum: epNum,
+            mediaType: 'episode',
+            streamUrl: '',
+          );
+
+          _allItemsMap[epItem.id] = epItem;
+          episodes.add(epItem);
+        }
+      }
     } catch (_) {}
 
     return episodes;
   }
 
+  // ==================== VERIFICAÇÃO INTELIGENTE DE SÉRIE ====================
+  Future<bool> checkIfSeries(MediaItem item) async {
+    if (item.isSeries || item.isAnime || item.isEpisode) return true;
+    if (_knownSeriesIds.contains(item.id)) return true;
+    if (_knownMovieIds.contains(item.id)) return false;
+    if (item.isLive) return false;
+
+    try {
+      final config = await _configRepository.getActiveConfig();
+      if (config == null) return false;
+      final url = config.resolveUrl('?page=viewItem&id=${item.id}');
+      final resp = await _apiClient.post(
+        url,
+        data: 'userHistoric=[]',
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: {'User-Agent': 'MegaFlix/1.2', ...?config.customHeaders},
+        ),
+      );
+      final html = resp.data?.toString() ?? '';
+      if (html.contains('class="season"') || html.contains('getEpisodes(')) {
+        _knownSeriesIds.add(item.id);
+        _allItemsMap[item.id] = item.copyWith(mediaType: 'series');
+        return true;
+      } else {
+        _knownMovieIds.add(item.id);
+        return false;
+      }
+    } catch (_) {
+      return false;
+    }
+  }
+
+  // ==================== LISTA DE SERVIDORES (DUBLADOS & LEGENDADOS) ====================
+  Future<MediaServersResult> getMediaServers(MediaItem item) async {
+    final dubbedUrls = <String>[];
+    final subbedUrls = <String>[];
+
+    try {
+      final config = await _configRepository.getActiveConfig();
+      final customHeaders = config?.customHeaders ?? {};
+
+      if (item.isEpisode || item.seriesId != null) {
+        // 1. EPISÓDIO DE SÉRIE
+        final targetId = item.seriesId ?? item.id;
+        final season = item.seasonNum ?? 1;
+        final episode = item.episodeNum ?? 1;
+
+        // A. Dados de Warez2
+        final warezUrl = 'https://megafrixapi.com/iptv/warez2.php?item_id=$targetId&season_num=$season&episode_num=$episode';
+        try {
+          final resp = await _apiClient.get(
+            warezUrl,
+            options: Options(
+              responseType: ResponseType.plain,
+              headers: {'User-Agent': 'MegaFlix/1.2', ...customHeaders},
+            ),
+          );
+          final raw = resp.data?.toString() ?? '';
+          if (raw.isNotEmpty) {
+            final decoded = jsonDecode(raw);
+            if (decoded is Map<String, dynamic>) {
+              if (decoded['br'] is List) {
+                for (final u in decoded['br'] as List) {
+                  dubbedUrls.add(u.toString());
+                }
+              }
+              if (decoded['eng'] is List) {
+                for (final u in decoded['eng'] as List) {
+                  subbedUrls.add(u.toString());
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        // B. Dados em cache de getEpisodes
+        if (_episodeRawUrls.containsKey(item.id)) {
+          final rawMap = _episodeRawUrls[item.id]!;
+          final brStr = rawMap['br'] ?? '';
+          final engStr = rawMap['eng'] ?? '';
+          if (brStr.isNotEmpty) {
+            for (final u in brStr.split(',')) {
+              if (u.trim().isNotEmpty) dubbedUrls.add(u.trim());
+            }
+          }
+          if (engStr.isNotEmpty) {
+            for (final u in engStr.split(',')) {
+              if (u.trim().isNotEmpty) subbedUrls.add(u.trim());
+            }
+          }
+        }
+      } else {
+        // 2. FILME
+        final movieId = item.id;
+
+        // A. Dados de Warez2
+        final warezUrl = 'https://megafrixapi.com/iptv/warez2.php?item_id=$movieId';
+        try {
+          final resp = await _apiClient.get(
+            warezUrl,
+            options: Options(
+              responseType: ResponseType.plain,
+              headers: {'User-Agent': 'MegaFlix/1.2', ...customHeaders},
+            ),
+          );
+          final raw = resp.data?.toString() ?? '';
+          if (raw.isNotEmpty) {
+            final decoded = jsonDecode(raw);
+            if (decoded is Map<String, dynamic>) {
+              if (decoded['br'] is List) {
+                for (final u in decoded['br'] as List) {
+                  dubbedUrls.add(u.toString());
+                }
+              }
+              if (decoded['eng'] is List) {
+                for (final u in decoded['eng'] as List) {
+                  subbedUrls.add(u.toString());
+                }
+              }
+            }
+          }
+        } catch (_) {}
+
+        // B. Dados do viewItem
+        try {
+          final viewUrl = config?.resolveUrl('?page=viewItem&id=$movieId') ?? '';
+          if (viewUrl.isNotEmpty) {
+            final resp = await _apiClient.post(
+              viewUrl,
+              data: 'userHistoric=[]',
+              options: Options(
+                responseType: ResponseType.plain,
+                headers: {'User-Agent': 'MegaFlix/1.2', ...customHeaders},
+              ),
+            );
+            final html = resp.data?.toString() ?? '';
+            final loadMatch = RegExp(r'''loadPlayers\(\{\s*br:\s*['"]([^'"]*)['"],\s*eng:\s*['"]([^'"]*)['"]''').firstMatch(html);
+            if (loadMatch != null) {
+              final brStr = loadMatch.group(1) ?? '';
+              final engStr = loadMatch.group(2) ?? '';
+              if (brStr.isNotEmpty) {
+                for (final u in brStr.split(',')) {
+                  if (u.trim().isNotEmpty) dubbedUrls.add(u.trim());
+                }
+              }
+              if (engStr.isNotEmpty) {
+                for (final u in engStr.split(',')) {
+                  if (u.trim().isNotEmpty) subbedUrls.add(u.trim());
+                }
+              }
+            }
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+
+    // Fallback: se nada foi retornado mas há streamUrl no item
+    if (dubbedUrls.isEmpty && subbedUrls.isEmpty && item.streamUrl.isNotEmpty) {
+      dubbedUrls.add(item.streamUrl);
+    }
+
+    final dubbed = _buildServerList(dubbedUrls, isDubbed: true);
+    final subbed = _buildServerList(subbedUrls, isDubbed: false);
+
+    return MediaServersResult(
+      dubbedServers: dubbed,
+      subbedServers: subbed,
+    );
+  }
+
+  List<MediaServer> _buildServerList(List<String> rawUrls, {required bool isDubbed}) {
+    final servers = <MediaServer>[];
+    final seenUrls = <String>{};
+
+    for (final rawUrl in rawUrls) {
+      final cleanUrl = rawUrl.trim();
+      if (cleanUrl.isEmpty || !cleanUrl.startsWith('http') || seenUrls.contains(cleanUrl)) {
+        continue;
+      }
+      seenUrls.add(cleanUrl);
+
+      final lower = cleanUrl.toLowerCase();
+      String name;
+      int priority;
+      String quality = '1080p Full HD';
+
+      if (lower.contains('voltz.php')) {
+        name = 'Servidor Voltz (Recomendado)';
+        priority = 10;
+        quality = '1080p 60fps';
+      } else if (lower.contains('upbolt') || lower.contains('bolt')) {
+        name = 'Servidor UpBolt';
+        priority = 20;
+        quality = '1080p Full HD';
+      } else if (lower.contains('lulu') || lower.contains('luluvdo')) {
+        name = 'Servidor Lulu';
+        priority = 30;
+        quality = '1080p Full HD';
+      } else if (lower.contains('hidehide') || lower.contains('vidhide') || lower.contains('hide')) {
+        name = 'Servidor VidHide';
+        priority = 40;
+        quality = '1080p Full HD';
+      } else if (lower.contains('byse')) {
+        name = 'Servidor Byse';
+        priority = 50;
+        quality = 'Full HD';
+      } else if (lower.contains('mixdrop') || lower.contains('mdy48')) {
+        name = 'Servidor MixDrop';
+        priority = 60;
+        quality = 'Full HD';
+      } else if (lower.contains('dood')) {
+        name = 'Servidor DoodStream';
+        priority = 70;
+        quality = 'HD 720p';
+      } else if (lower.contains('gocine')) {
+        name = 'Servidor GoCine';
+        priority = 80;
+        quality = '1080p Full HD';
+      } else if (lower.contains('vidara')) {
+        name = 'Servidor Vidara';
+        priority = 90;
+        quality = '1080p Full HD';
+      } else if (lower.contains('playmate')) {
+        name = 'Servidor Playmate';
+        priority = 100;
+        quality = 'Full HD';
+      } else if (lower.contains('upns') || lower.contains('megafl')) {
+        name = 'Servidor Upns';
+        priority = 110;
+        quality = 'Full HD';
+      } else if (lower.contains('take')) {
+        name = 'Servidor Take';
+        priority = 120;
+        quality = 'Full HD';
+      } else if (lower.contains('redeflix') || lower.contains('rdf')) {
+        name = 'Servidor Redeflix';
+        priority = 130;
+        quality = 'Full HD';
+      } else if (lower.contains('.mp4') || lower.contains('cnvs/')) {
+        name = 'Servidor MP4 Direto';
+        priority = 140;
+        quality = '1080p Full HD';
+      } else {
+        name = 'Servidor Alternativo ${servers.length + 1}';
+        priority = 200 + servers.length;
+        quality = 'Full HD';
+      }
+
+      servers.add(
+        MediaServer(
+          id: 'srv_${servers.length}_${cleanUrl.hashCode}',
+          name: name,
+          url: cleanUrl,
+          isDubbed: isDubbed,
+          quality: quality,
+          priority: priority,
+        ),
+      );
+    }
+
+    servers.sort((a, b) => a.priority.compareTo(b.priority));
+    return servers;
+  }
+
   // ==================== STREAM RESOLVER DINÂMICO ====================
+  Future<String?> resolveServerStream(MediaServer server) async {
+    final url = server.url;
+    if (url.contains('voltz.php')) {
+      final voltz = await _resolveVoltzStream(url);
+      if (voltz != null && voltz.isNotEmpty) return voltz;
+    }
+
+    if (url.contains('.mp4') || url.contains('.m3u8')) {
+      return url;
+    }
+
+    try {
+      final getUrlEndpoint = 'https://megafrixapi.com/iptv/get_url.php?url=${Uri.encodeComponent(url)}';
+      final resp = await _apiClient.get(
+        getUrlEndpoint,
+        options: Options(
+          responseType: ResponseType.plain,
+          headers: {'User-Agent': 'MegaFlix/1.2'},
+        ),
+      );
+      final body = resp.data?.toString() ?? '';
+      final regex = RegExp(r'''(?:var|const|let)\s+stream\s*=\s*['"](https?://[^'"]+)['"]''');
+      final m = regex.firstMatch(body);
+      if (m != null && m.group(1) != null) {
+        return m.group(1)!;
+      }
+    } catch (_) {}
+
+    return url;
+  }
+
   Future<String?> resolveStreamUrl(MediaItem item) async {
     // 1. Canais ao vivo
     if (item.isLive || item.streamUrl.contains('get_token_channel.php')) {
@@ -428,37 +770,14 @@ class CatalogRepository {
       return await _resolveTokenToM3u8(tokenUrl);
     }
 
-    // 2. Filmes ou Episódios via Warez2 / Voltz
-    final targetId = item.seriesId ?? item.id;
-    final seasonParam = item.seasonNum != null ? '&season_num=${item.seasonNum}' : '';
-    final epParam = item.episodeNum != null ? '&episode_num=${item.episodeNum}' : '';
-    final warezUrl = 'https://megafrixapi.com/iptv/warez2.php?item_id=$targetId$seasonParam$epParam';
-
+    // 2. Busca lista de servidores e resolve o melhor
     try {
-      final resp = await _apiClient.get(
-        warezUrl,
-        options: Options(
-          responseType: ResponseType.plain,
-          headers: {'User-Agent': 'MegaFlix/1.2'},
-        ),
-      );
-
-      final raw = resp.data?.toString() ?? '';
-      if (raw.isNotEmpty) {
-        final decoded = jsonDecode(raw);
-        if (decoded is Map<String, dynamic> && decoded['br'] is List) {
-          final brList = decoded['br'] as List;
-          for (final entry in brList) {
-            final urlStr = entry.toString();
-            if (urlStr.contains('voltz.php')) {
-              final voltzResolved = await _resolveVoltzStream(urlStr);
-              if (voltzResolved != null && voltzResolved.isNotEmpty) {
-                return voltzResolved;
-              }
-            } else if (urlStr.contains('.mp4') || urlStr.contains('.m3u8')) {
-              return urlStr;
-            }
-          }
+      final servers = await getMediaServers(item);
+      final bestList = servers.dubbedServers.isNotEmpty ? servers.dubbedServers : servers.subbedServers;
+      if (bestList.isNotEmpty) {
+        final resolved = await resolveServerStream(bestList.first);
+        if (resolved != null && resolved.isNotEmpty) {
+          return resolved;
         }
       }
     } catch (_) {}
@@ -474,6 +793,7 @@ class CatalogRepository {
 
     return null;
   }
+
 
   Future<String?> _resolveVoltzStream(String url) async {
     try {
@@ -600,6 +920,20 @@ class CatalogRepository {
       if (titleMatch == null) continue;
 
       final title = titleMatch.group(1)!.trim();
+      final lowerTitle = title.toLowerCase();
+
+      final isSeriesCategory = defaultType == 'series' ||
+          defaultType == 'anime' ||
+          lowerTitle.contains('série') ||
+          lowerTitle.contains('series') ||
+          lowerTitle.contains('novela') ||
+          lowerTitle.contains('anime') ||
+          lowerTitle.contains('dorama') ||
+          lowerTitle.contains('temporada') ||
+          sectionBlock.contains('data-type="2"');
+
+      final effectiveType = isSeriesCategory ? 'series' : defaultType;
+
       final itemsB64 = RegExp(r'data-data="([^"]+)"').allMatches(sectionBlock);
       final items = <MediaItem>[];
 
@@ -619,6 +953,12 @@ class CatalogRepository {
           final id = map['id']?.toString() ?? '';
           if (id.isEmpty) continue;
 
+          if (isSeriesCategory) {
+            _knownSeriesIds.add(id);
+          } else if (defaultType == 'movie') {
+            _knownMovieIds.add(id);
+          }
+
           final item = MediaItem(
             id: id,
             title: map['titulo'] ?? map['title'] ?? map['name'] ?? 'Título',
@@ -626,7 +966,7 @@ class CatalogRepository {
             posterUrl: map['img'] ?? map['poster'],
             backdropUrl: map['bg'] ?? map['background'] ?? map['img'],
             year: map['ano']?.toString() ?? map['year']?.toString(),
-            mediaType: defaultType,
+            mediaType: effectiveType,
             streamUrl: '',
           );
 

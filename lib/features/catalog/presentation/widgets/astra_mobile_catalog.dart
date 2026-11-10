@@ -6,6 +6,7 @@ import '../widgets/astra_brand.dart';
 import '../widgets/astra_media_card.dart';
 import '../widgets/category_chips_bar.dart';
 import '../widgets/series_episodes_modal.dart';
+import '../widgets/server_selector_modal.dart';
 import '../pages/search_page.dart';
 import '../../../player/presentation/pages/player_page.dart';
 import '../../../admin/presentation/pages/admin_panel_page.dart';
@@ -53,28 +54,124 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
   MediaItem? _activeLiveChannel;
   int _activeLiveIndex = 0;
 
+  // Gerenciamento de dados reativos e carregamento de abas
+  List<MediaCategory> _channelsCategories = [];
+  List<MediaCategory> _moviesCategories = [];
+  List<MediaCategory> _seriesCategories = [];
+  bool _isLoadingChannels = false;
+  bool _isLoadingMovies = false;
+  bool _isLoadingSeries = false;
+
   @override
   void initState() {
     super.initState();
+    _channelsCategories = List.from(widget.channelsCategories);
+    _moviesCategories = List.from(widget.moviesCategories);
+    _seriesCategories = List.from(widget.seriesCategories);
+
     _initLiveChannel();
+    _prefetchTabs();
+  }
+
+  @override
+  void didUpdateWidget(AstraMobileCatalog oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.channelsCategories.isNotEmpty && _channelsCategories.isEmpty) {
+      _channelsCategories = List.from(widget.channelsCategories);
+      _initLiveChannel();
+    }
+    if (widget.moviesCategories.isNotEmpty && _moviesCategories.isEmpty) {
+      _moviesCategories = List.from(widget.moviesCategories);
+    }
+    if (widget.seriesCategories.isNotEmpty && _seriesCategories.isEmpty) {
+      _seriesCategories = List.from(widget.seriesCategories);
+    }
+  }
+
+  void _prefetchTabs() {
+    if (_channelsCategories.isEmpty) _loadChannels();
+    if (_moviesCategories.isEmpty) _loadMovies();
+    if (_seriesCategories.isEmpty) _loadSeries();
+  }
+
+  Future<void> _loadChannels() async {
+    if (_isLoadingChannels) return;
+    setState(() => _isLoadingChannels = true);
+    final channels = await widget.repository.getChannels();
+    if (mounted) {
+      setState(() {
+        _channelsCategories = channels;
+        _isLoadingChannels = false;
+        if (_activeLiveChannel == null && channels.isNotEmpty && channels.first.items.isNotEmpty) {
+          _activeLiveChannel = channels.first.items.first;
+          _activeLiveIndex = 0;
+        }
+      });
+    }
+  }
+
+  Future<void> _loadMovies() async {
+    if (_isLoadingMovies) return;
+    setState(() => _isLoadingMovies = true);
+    final movies = await widget.repository.getMovies();
+    if (mounted) {
+      setState(() {
+        _moviesCategories = movies;
+        _isLoadingMovies = false;
+      });
+    }
+  }
+
+  Future<void> _loadSeries() async {
+    if (_isLoadingSeries) return;
+    setState(() => _isLoadingSeries = true);
+    final series = await widget.repository.getSeries();
+    if (mounted) {
+      setState(() {
+        _seriesCategories = series;
+        _isLoadingSeries = false;
+      });
+    }
+  }
+
+  void _selectTab(MobileNavTab tab) {
+    setState(() => _currentTab = tab);
+
+    if (tab == MobileNavTab.movies && _moviesCategories.isEmpty) {
+      _loadMovies();
+    } else if (tab == MobileNavTab.series && _seriesCategories.isEmpty) {
+      _loadSeries();
+    } else if (tab == MobileNavTab.liveTv && _channelsCategories.isEmpty) {
+      _loadChannels();
+    }
   }
 
   void _initLiveChannel() {
-    if (widget.channelsCategories.isNotEmpty &&
-        widget.channelsCategories.first.items.isNotEmpty) {
-      _activeLiveChannel = widget.channelsCategories.first.items.first;
+    final list = _channelsCategories.isNotEmpty
+        ? _channelsCategories
+        : widget.channelsCategories;
+    if (list.isNotEmpty && list.first.items.isNotEmpty) {
+      _activeLiveChannel = list.first.items.first;
       _activeLiveIndex = 0;
     }
   }
 
-  void _handleItemPress(MediaItem item) {
-    if (item.isSeries) {
-      SeriesEpisodesModal.show(context, series: item, repository: widget.repository);
-    } else {
+  Future<void> _handleItemPress(MediaItem item) async {
+    if (item.isLive) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => PlayerPage(item: item)),
       );
+      return;
+    }
+
+    final isSeries = await widget.repository.checkIfSeries(item);
+    if (!mounted) return;
+
+    if (isSeries) {
+      SeriesEpisodesModal.show(context, series: item.copyWith(mediaType: 'series'), repository: widget.repository);
+    } else {
+      ServerSelectorModal.show(context, item: item.copyWith(mediaType: 'movie'), repository: widget.repository);
     }
   }
 
@@ -385,9 +482,55 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
 
   // ==================== 2. ABA LIVE TV MOBILE (MobileLive Figma) ====================
   Widget _buildMobileLiveTv() {
-    final allChannels = widget.channelsCategories.isNotEmpty
-        ? widget.channelsCategories.first.items
-        : <MediaItem>[];
+    if (_isLoadingChannels && _channelsCategories.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppTheme.cyan),
+            SizedBox(height: 16),
+            Text(
+              'Carregando canais ao vivo...',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
+    final allChannels = _channelsCategories.isNotEmpty
+        ? _channelsCategories.first.items
+        : (widget.channelsCategories.isNotEmpty
+            ? widget.channelsCategories.first.items
+            : <MediaItem>[]);
+
+    if (allChannels.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.live_tv_outlined, size: 54, color: Colors.white24),
+            const SizedBox(height: 16),
+            const Text(
+              'Nenhum canal carregado.',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loadChannels,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.cyan,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              child: const Text(
+                'Carregar Canais',
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
 
     if (_activeLiveChannel == null && allChannels.isNotEmpty) {
       _activeLiveChannel = allChannels.first;
@@ -672,6 +815,22 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
 
   // ==================== 3. ABA FILMES MOBILE ====================
   Widget _buildMoviesTab() {
+    if (_isLoadingMovies && _moviesCategories.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppTheme.cyan),
+            SizedBox(height: 16),
+            Text(
+              'Carregando catálogo de filmes...',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
     final chips = [
       '★ Todos',
       '💥 Ação',
@@ -684,12 +843,43 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
       '🚀 Ficção',
     ];
 
-    List<MediaCategory> visible = widget.moviesCategories;
+    List<MediaCategory> visible = _moviesCategories.isNotEmpty
+        ? _moviesCategories
+        : widget.moviesCategories;
+
     if (_selectedMovieFilter != '★ Todos') {
       final cleanFilter = _selectedMovieFilter.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').trim();
-      visible = widget.moviesCategories.where((cat) {
+      visible = visible.where((cat) {
         return cat.title.toLowerCase().contains(cleanFilter.toLowerCase());
       }).toList();
+    }
+
+    if (visible.isEmpty && !_isLoadingMovies) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.movie_outlined, size: 54, color: Colors.white24),
+            const SizedBox(height: 16),
+            const Text(
+              'Nenhum filme carregado.',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loadMovies,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.cyan,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              child: const Text(
+                'Carregar Filmes',
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return Column(
@@ -753,6 +943,22 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
 
   // ==================== 4. ABA SÉRIES MOBILE ====================
   Widget _buildSeriesTab() {
+    if (_isLoadingSeries && _seriesCategories.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(color: AppTheme.cyan),
+            SizedBox(height: 16),
+            Text(
+              'Carregando catálogo de séries...',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+          ],
+        ),
+      );
+    }
+
     final chips = [
       '★ Todos',
       '💥 Action & Adventure',
@@ -763,12 +969,43 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
       '🚀 Ficção',
     ];
 
-    List<MediaCategory> visible = widget.seriesCategories;
+    List<MediaCategory> visible = _seriesCategories.isNotEmpty
+        ? _seriesCategories
+        : widget.seriesCategories;
+
     if (_selectedSeriesFilter != '★ Todos') {
       final cleanFilter = _selectedSeriesFilter.replaceAll(RegExp(r'[^a-zA-Z0-9]'), '').trim();
-      visible = widget.seriesCategories.where((cat) {
+      visible = visible.where((cat) {
         return cat.title.toLowerCase().contains(cleanFilter.toLowerCase());
       }).toList();
+    }
+
+    if (visible.isEmpty && !_isLoadingSeries) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.tv_outlined, size: 54, color: Colors.white24),
+            const SizedBox(height: 16),
+            const Text(
+              'Nenhuma série carregada.',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _loadSeries,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppTheme.cyan,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+              ),
+              child: const Text(
+                'Carregar Séries',
+                style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        ),
+      );
     }
 
     return Column(
@@ -829,6 +1066,7 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
       ],
     );
   }
+
 
   // ==================== 5. ABA FAVORITOS MOBILE ====================
   Widget _buildFavoritesTab() {
@@ -911,11 +1149,11 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
-          _buildNavItem(MobileNavTab.home, 'Home', Icons.home),
-          _buildNavItem(MobileNavTab.movies, 'Movies', Icons.movie_outlined),
-          _buildNavItem(MobileNavTab.series, 'Series', Icons.grid_view),
-          _buildNavItem(MobileNavTab.liveTv, 'Live TV', Icons.tv),
-          _buildNavItem(MobileNavTab.favorites, 'Favorites', Icons.star_border),
+          _buildNavItem(MobileNavTab.home, 'Início', Icons.home),
+          _buildNavItem(MobileNavTab.movies, 'Filmes', Icons.movie_outlined),
+          _buildNavItem(MobileNavTab.series, 'Séries', Icons.grid_view),
+          _buildNavItem(MobileNavTab.liveTv, 'Canais', Icons.tv),
+          _buildNavItem(MobileNavTab.favorites, 'Favoritos', Icons.star_border),
         ],
       ),
     );
@@ -925,7 +1163,7 @@ class _AstraMobileCatalogState extends State<AstraMobileCatalog> {
     final isActive = _currentTab == tab;
 
     return GestureDetector(
-      onTap: () => setState(() => _currentTab = tab),
+      onTap: () => _selectTab(tab),
       behavior: HitTestBehavior.opaque,
       child: SizedBox(
         width: 64,

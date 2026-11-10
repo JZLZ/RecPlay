@@ -4,6 +4,7 @@ import '../../../../core/widgets/tv_focusable.dart';
 import '../../domain/entities/media_item.dart';
 import '../../data/repositories/catalog_repository.dart';
 import '../../../player/presentation/pages/player_page.dart';
+import 'server_selector_modal.dart';
 
 class SeriesEpisodesModal extends StatefulWidget {
   final MediaItem series;
@@ -136,7 +137,7 @@ class _SeriesEpisodesModalState extends State<SeriesEpisodesModal> {
           if (_isLoadingSeasons)
             const Padding(
               padding: EdgeInsets.all(24),
-              child: Center(child: CircularProgressIndicator(color: AppTheme.primary)),
+              child: Center(child: CircularProgressIndicator(color: AppTheme.cyan)),
             )
           else if (_seasons.isNotEmpty)
             SizedBox(
@@ -157,16 +158,16 @@ class _SeriesEpisodesModalState extends State<SeriesEpisodesModal> {
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                         decoration: BoxDecoration(
-                          color: isSelected ? AppTheme.primary : AppTheme.surfaceCard,
+                          color: isSelected ? AppTheme.cyan : AppTheme.surfaceCard,
                           borderRadius: BorderRadius.circular(20),
                           border: Border.all(
-                            color: isSelected ? AppTheme.primary : Colors.white12,
+                            color: isSelected ? AppTheme.cyan : Colors.white12,
                           ),
                         ),
                         child: Text(
                           s.title,
                           style: TextStyle(
-                            color: isSelected ? Colors.white : AppTheme.textSecondary,
+                            color: isSelected ? Colors.black : AppTheme.textSecondary,
                             fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
                             fontSize: 13,
                           ),
@@ -182,7 +183,7 @@ class _SeriesEpisodesModalState extends State<SeriesEpisodesModal> {
           // Lista de Episódios
           Expanded(
             child: _isLoadingEpisodes
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.primary))
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.cyan))
                 : _episodes.isEmpty
                     ? const Center(
                         child: Text(
@@ -201,9 +202,10 @@ class _SeriesEpisodesModalState extends State<SeriesEpisodesModal> {
                             child: TvFocusable(
                               borderRadius: BorderRadius.circular(10),
                               onPressed: () {
-                                Navigator.push(
+                                ServerSelectorModal.show(
                                   context,
-                                  MaterialPageRoute(builder: (_) => PlayerPage(item: ep)),
+                                  item: ep,
+                                  repository: widget.repository,
                                 );
                               },
                               child: Container(
@@ -265,7 +267,7 @@ class _SeriesEpisodesModalState extends State<SeriesEpisodesModal> {
                                     ),
 
                                     // Ícone de Play
-                                    const Icon(Icons.play_arrow, color: AppTheme.primary, size: 28),
+                                    const Icon(Icons.play_arrow, color: AppTheme.cyan, size: 28),
                                   ],
                                 ),
                               ),

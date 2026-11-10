@@ -151,3 +151,42 @@ class SeasonInfo extends Equatable {
   @override
   List<Object?> get props => [seasonNum, title];
 }
+
+class MediaServer extends Equatable {
+  final String id;
+  final String name;
+  final String url;
+  final bool isDubbed; // true = Dublado, false = Legendado
+  final String quality;
+  final int priority;
+
+  const MediaServer({
+    required this.id,
+    required this.name,
+    required this.url,
+    required this.isDubbed,
+    this.quality = '1080p Full HD',
+    this.priority = 100,
+  });
+
+  @override
+  List<Object?> get props => [id, name, url, isDubbed, quality];
+}
+
+class MediaServersResult extends Equatable {
+  final List<MediaServer> dubbedServers;
+  final List<MediaServer> subbedServers;
+
+  const MediaServersResult({
+    this.dubbedServers = const [],
+    this.subbedServers = const [],
+  });
+
+  bool get isEmpty => dubbedServers.isEmpty && subbedServers.isEmpty;
+  bool get isNotEmpty => !isEmpty;
+  int get totalCount => dubbedServers.length + subbedServers.length;
+
+  @override
+  List<Object?> get props => [dubbedServers, subbedServers];
+}
+

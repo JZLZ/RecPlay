@@ -17,6 +17,7 @@ import '../widgets/astra_mobile_catalog.dart';
 import '../widgets/category_chips_bar.dart';
 import '../widgets/quick_zap_bar.dart';
 import '../widgets/series_episodes_modal.dart';
+import '../widgets/server_selector_modal.dart';
 import 'search_page.dart';
 
 class CatalogPage extends StatefulWidget {
@@ -89,6 +90,23 @@ class _CatalogPageState extends State<CatalogPage> {
       _isTv = type == DeviceType.television;
     });
     await _loadTabContent(_currentTab);
+
+    // Pré-carrega canais, filmes e séries em segundo plano
+    widget.catalogRepository.getChannels().then((channels) {
+      if (mounted && _channelsCategories.isEmpty) {
+        setState(() => _channelsCategories = channels);
+      }
+    });
+    widget.catalogRepository.getMovies().then((movies) {
+      if (mounted && _moviesCategories.isEmpty) {
+        setState(() => _moviesCategories = movies);
+      }
+    });
+    widget.catalogRepository.getSeries().then((series) {
+      if (mounted && _seriesCategories.isEmpty) {
+        setState(() => _seriesCategories = series);
+      }
+    });
   }
 
   Future<void> _loadTabContent(CatalogNavTab tab) async {
@@ -174,17 +192,29 @@ class _CatalogPageState extends State<CatalogPage> {
     }
   }
 
-  void _handleItemPress(MediaItem item) {
-    if (item.isSeries) {
-      SeriesEpisodesModal.show(
-        context,
-        series: item,
-        repository: widget.catalogRepository,
-      );
-    } else {
+  Future<void> _handleItemPress(MediaItem item) async {
+    if (item.isLive) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => PlayerPage(item: item)),
+      );
+      return;
+    }
+
+    final isSeries = await widget.catalogRepository.checkIfSeries(item);
+    if (!mounted) return;
+
+    if (isSeries) {
+      SeriesEpisodesModal.show(
+        context,
+        series: item.copyWith(mediaType: 'series'),
+        repository: widget.catalogRepository,
+      );
+    } else {
+      ServerSelectorModal.show(
+        context,
+        item: item.copyWith(mediaType: 'movie'),
+        repository: widget.catalogRepository,
       );
     }
   }

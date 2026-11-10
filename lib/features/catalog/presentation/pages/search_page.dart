@@ -7,6 +7,7 @@ import '../../data/repositories/catalog_repository.dart';
 import '../widgets/astra_media_card.dart';
 import '../widgets/astra_brand.dart';
 import '../widgets/series_episodes_modal.dart';
+import '../widgets/server_selector_modal.dart';
 import '../../../player/presentation/pages/player_page.dart';
 
 class SearchPage extends StatefulWidget {
@@ -108,14 +109,22 @@ class _SearchPageState extends State<SearchPage> {
     });
   }
 
-  void _handleItemPress(MediaItem item) {
-    if (item.isSeries) {
-      SeriesEpisodesModal.show(context, series: item, repository: widget.repository);
-    } else {
+  Future<void> _handleItemPress(MediaItem item) async {
+    if (item.isLive) {
       Navigator.push(
         context,
         MaterialPageRoute(builder: (_) => PlayerPage(item: item)),
       );
+      return;
+    }
+
+    final isSeries = await widget.repository.checkIfSeries(item);
+    if (!mounted) return;
+
+    if (isSeries) {
+      SeriesEpisodesModal.show(context, series: item.copyWith(mediaType: 'series'), repository: widget.repository);
+    } else {
+      ServerSelectorModal.show(context, item: item.copyWith(mediaType: 'movie'), repository: widget.repository);
     }
   }
 
